@@ -9,8 +9,7 @@ enum PromiseStates {
 interface CustomPromise {
   state: string;
   value: any;
-  fulfilledCallbacks: Array<Function>;
-  rejectedCallbacks: Array<Function>;
+  callbacks: Array<thenCallbacks>;
 
   resolve: resolve;
   reject: reject;
@@ -33,6 +32,14 @@ interface then {
   (onFulfilled?: Function, onRejected?: Function);
 }
 
+interface thenCallbacks {
+  onFulfilled: Function;
+  onRejected: Function;
+}
+
+/** catch 메소드 인터페이스
+ *  인터페이스로 catch라는 이름을 사용할 수 없어 myCatch로 명명
+ */
 interface myCatch {
   (onRejected?: Function);
 }
@@ -46,64 +53,72 @@ interface excecutor {
 export class MyPromise implements CustomPromise {
   state: string;
   value: any;
-  fulfilledCallbacks: Array<Function>;
-  rejectedCallbacks: Array<Function>;
+  callbacks: Array<thenCallbacks>;
 
   constructor(excecutor: excecutor) {
     this.state = PromiseStates.PENDING;
     this.value = undefined;
-    this.fulfilledCallbacks = [];
-    this.rejectedCallbacks = [];
+    this.callbacks = [];
 
-    setTimeout(
-      function () {
-        excecutor(this.resolve.bind(this), this.reject.bind(this));
-      }.bind(this),
-      0
-    );
+    try {
+      excecutor(this.resolve.bind(this), this.reject.bind(this));
+    } catch (error) {
+      this.reject(error);
+    }
   }
+
   /** 프로미스 인스턴스를 이행(fulfilled) 상태로 귀결(settled) 시키는 메소드 */
   resolve(value: any) {
-    // 프로미스 인스턴스가 이미 귀결 상태라면 무시해주기
-    if (this.state !== PromiseStates.PENDING) return;
-
-    // 프로미스 인스턴스의 상태와 귀결값 설정
-    this.state = PromiseStates.FULFILLED;
-    this.value = value;
-
-    // 동기적으로 콜백들이 실행되지 않도록 setTimeout으로 설정하여 지연시켜주기
-    // 그렇지 않으면 동기적으로 콜백들이 하나의 then 체이닝이 끝날 때까지 재귀적으로 연계된다.
-    // 이 경우 같은 프로미스 인스턴스에 대한 분기를 사용할 수 없게 됨.
-    setTimeout(
-      function () {
-        // then으로 등록된 콜백들을 실행시킨다.
-        // console.log(this.fulfilledCallbacks, "등록된 이행콜백들");
-        this.fulfilledCallbacks.forEach((callback) => {
-          callback(this.value);
-        }, this);
-      }.bind(this),
-      0
-    );
+    this.updateData(value, PromiseStates.FULFILLED);
   }
 
   /** 프로미스 인스턴스를 거절(rejected) 상태로 귀결시키는 메소드 */
   reject(value: any) {
-    // 프로미스 인스턴스가 이미 귀결 상태라면 무시해주기
-    if (this.state !== PromiseStates.PENDING) return;
+    this.updateData(value, PromiseStates.REJECTED);
+  }
 
-    // 프로미스 인스턴스의 상태와 귀결값 설정
-    this.state = PromiseStates.REJECTED;
-    this.value = value;
-
-    // then으로 등록된 콜백들을 실행시킨다.
+  updateData(value, state) {
+    // setTimeout으로 설정하여 지연시켜주기
+    // 그렇지 않으면 동기적으로 then 체이닝이 끝날 때까지 재귀적으로 연계된다.
+    // 이 경우 같은 프로미스 인스턴스에 대한 분기를 사용할 수 없게 됨.
     setTimeout(
       function () {
-        this.rejectedCallbacks.forEach((callback) => {
-          callback(this.value);
-        }, this);
+        // 프로미스 인스턴스가 이미 귀결 상태라면 무시해주기
+        if (this.state !== PromiseStates.PENDING) return;
+
+        // value가 프로미스 인스턴스라면 이들을 먼저 귀결할 것
+        if (MyPromise.prototype.isPrototypeOf(value)) {
+          return value.then(this.resolve.bind(this), this.reject.bind(this));
+        }
+
+        // 프로미스 인스턴스의 상태와 귀결값 설정
+        this.value = value;
+        this.state = state;
+
+        this.executeCallbacks.call(this);
       }.bind(this),
       0
     );
+  }
+
+  /** then으로 등록된 콜백을 실행시켜주는 메소드
+   *  비동기적으로 실행되므로 이미 동기적으로 then의 콜백들이 등록된 상태
+   */
+  executeCallbacks() {
+    // 아직 대기 상태라면 끝낸다
+    if (this.state === PromiseStates.PENDING) return;
+
+    // then으로 등록된 callback들을 실행시켜준다.
+    this.callbacks.forEach((callback) => {
+      if (this.state === PromiseStates.FULFILLED) {
+        return callback.onFulfilled(this.value);
+      }
+
+      return callback.onRejected(this.value);
+    });
+
+    // 사용한 콜백들을 비워준다.
+    this.callbacks = [];
   }
 
   /** 프로미스 귀결 시 호출될 callback 들을 등록하는 메소드
@@ -113,54 +128,41 @@ export class MyPromise implements CustomPromise {
   then(onFulfilled?: Function, onRejected?: Function) {
     return new MyPromise(
       function (resolve, reject) {
-        // 이 콜백 배열은 지금 생성되는 프로미스의 것이 아니라 이전 프로미스의 것
+        // 이 콜백 배열은 지금 생성되는 프로미스 인스턴스의 것이 아니라 이전 프로미스 인스턴스의 것
+        // 여기 추가되는 콜백들은 이전 프로미스 인스턴스가 귀결될 때 작동한다.
+        this.callbacks.push({
+          onFulfilled: function (value) {
+            try {
+              // onFulfilled 콜백이 주입되지 않더라도 귀결된 결과 다음 체이닝에 전달
+              // 즉, 다음 프로미스를 귀결시킨다.
 
-        this.fulfilledCallbacks.push((value) => {
-          try {
-            // onFulfilled 콜백이 주입되지 않더라도 귀결된 결과 다음 체이닝에 전달
-            if (!onFulfilled) {
-              resolve(value);
+              if (!onFulfilled) {
+                return resolve(value);
+              }
+
+              // 이행 콜백의 결과값 구하기
+
+              return resolve(onFulfilled(value));
+            } catch (error) {
+              reject(error);
             }
-            // 이행 콜백의 결과값 구하기
-            const callbackValue = onFulfilled(this.value);
+          },
 
-            // value가 프로미스 객체라면
-            if (MyPromise.prototype.isPrototypeOf(value)) {
-              value.then(resolve, reject);
+          onRejected: function (value) {
+            try {
+              // onRejected 콜백이 주입되지 않더라도 귀결된 결과 다음 체이닝에 전달
+              if (!onRejected) {
+                return reject(value);
+              }
 
-              return;
+              return reject(onRejected(value));
+            } catch (error) {
+              return reject(error);
             }
-
-            resolve(callbackValue);
-          } catch (error) {
-            reject(error);
-          }
+          },
         });
 
-        this.rejectedCallbacks.push((value) => {
-          try {
-            // onRejected 콜백이 주입되지 않더라도 귀결된 결과 다음 체이닝에 전달
-            if (!onRejected) {
-              reject(value);
-
-              return;
-            }
-
-            // 거절 콜백의 결과값 구하기
-            const callbackValue = onRejected(this.value);
-
-            // value가 프로미스 객체라면
-            if (MyPromise.prototype.isPrototypeOf(value)) {
-              value.then(resolve, reject);
-
-              return;
-            }
-
-            reject(callbackValue);
-          } catch (error) {
-            reject(error);
-          }
-        });
+        this.executeCallbacks.call(this);
       }.bind(this)
     );
   }
