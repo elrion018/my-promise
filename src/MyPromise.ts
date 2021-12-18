@@ -15,6 +15,7 @@ interface CustomPromise {
   resolve: resolve;
   reject: reject;
   then: then;
+  catch: myCatch;
 }
 
 /** resolve 메소드 인터페이스 */
@@ -30,6 +31,10 @@ interface reject {
 /** then 메소드 인터페이스 */
 interface then {
   (onFulfilled?: Function, onRejected?: Function);
+}
+
+interface myCatch {
+  (onRejected?: Function);
 }
 
 /** 프로미스 생성자가 파라미터로 갖는 excecutor 함수의 인터페이스 */
@@ -50,20 +55,29 @@ export class MyPromise implements CustomPromise {
     this.fulfilledCallbacks = [];
     this.rejectedCallbacks = [];
 
-    excecutor(this.resolve.bind(this), this.reject.bind(this));
+    setTimeout(
+      function () {
+        excecutor(this.resolve.bind(this), this.reject.bind(this));
+      }.bind(this),
+      0
+    );
   }
   /** 프로미스 인스턴스를 이행(fulfilled) 상태로 귀결(settled) 시키는 메소드 */
   resolve(value: any) {
+    // 프로미스 인스턴스가 이미 귀결 상태라면 무시해주기
+    if (this.state !== PromiseStates.PENDING) return;
+
+    // 프로미스 인스턴스의 상태와 귀결값 설정
+    this.state = PromiseStates.FULFILLED;
+    this.value = value;
+
+    // 동기적으로 콜백들이 실행되지 않도록 setTimeout으로 설정하여 지연시켜주기
+    // 그렇지 않으면 동기적으로 콜백들이 하나의 then 체이닝이 끝날 때까지 재귀적으로 연계된다.
+    // 이 경우 같은 프로미스 인스턴스에 대한 분기를 사용할 수 없게 됨.
     setTimeout(
       function () {
-        // 프로미스 인스턴스가 이미 귀결 상태라면 무시해주기
-        if (this.state !== PromiseStates.PENDING) return;
-
-        // 프로미스 인스턴스의 상태와 귀결값 설정
-        this.state = PromiseStates.FULFILLED;
-        this.value = value;
-
         // then으로 등록된 콜백들을 실행시킨다.
+        // console.log(this.fulfilledCallbacks, "등록된 이행콜백들");
         this.fulfilledCallbacks.forEach((callback) => {
           callback(this.value);
         }, this);
@@ -82,9 +96,14 @@ export class MyPromise implements CustomPromise {
     this.value = value;
 
     // then으로 등록된 콜백들을 실행시킨다.
-    this.rejectedCallbacks.forEach((callback) => {
-      callback(this.value);
-    }, this);
+    setTimeout(
+      function () {
+        this.rejectedCallbacks.forEach((callback) => {
+          callback(this.value);
+        }, this);
+      }.bind(this),
+      0
+    );
   }
 
   /** 프로미스 귀결 시 호출될 callback 들을 등록하는 메소드 */
@@ -93,10 +112,15 @@ export class MyPromise implements CustomPromise {
   then(onFulfilled?: Function, onRejected?: Function) {
     return new MyPromise(
       function (resolve, reject) {
-        this.fulfilledCallbacks.push(() => {
+        // 이 콜백 배열은 지금 생성되는 프로미스의 것이 아니라 이전 프로미스의 것
+        this.fulfilledCallbacks.push((value) => {
           try {
+            // onFulfilled 콜백이 주입되지 않더라도 귀결된 결과 다음 체이닝에 전달
+            if (!onFulfilled) {
+              resolve(value);
+            }
             // 이행 콜백의 결과값 구하기
-            const value = onFulfilled(this.value);
+            const callbackValue = onFulfilled(this.value);
 
             // value가 프로미스 객체라면
             if (MyPromise.prototype.isPrototypeOf(value)) {
@@ -105,16 +129,23 @@ export class MyPromise implements CustomPromise {
               return;
             }
 
-            resolve(value);
+            resolve(callbackValue);
           } catch (error) {
             reject(error);
           }
         });
 
-        this.rejectedCallbacks.push(() => {
+        this.rejectedCallbacks.push((value) => {
           try {
+            // onRejected 콜백이 주입되지 않더라도 귀결된 결과 다음 체이닝에 전달
+            if (!onRejected) {
+              reject(value);
+
+              return;
+            }
+
             // 거절 콜백의 결과값 구하기
-            const value = onRejected(this.value);
+            const callbackValue = onRejected(this.value);
 
             // value가 프로미스 객체라면
             if (MyPromise.prototype.isPrototypeOf(value)) {
@@ -123,7 +154,7 @@ export class MyPromise implements CustomPromise {
               return;
             }
 
-            reject();
+            reject(callbackValue);
           } catch (error) {
             reject(error);
           }
@@ -131,4 +162,6 @@ export class MyPromise implements CustomPromise {
       }.bind(this)
     );
   }
+
+  catch(onRejected: Function) {}
 }
