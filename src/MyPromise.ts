@@ -106,13 +106,15 @@ export class MyPromise implements CustomPromise {
     );
   }
 
-  /** 프로미스 귀결 시 호출될 callback 들을 등록하는 메소드 */
-  /** 체이닝을 위해 프로미스 인스턴스를 반환해야한다. */
-  /** 등록된 콜백의 결과값은 반환된 프로미스가 또 다시 귀결시킨다. */
+  /** 프로미스 귀결 시 호출될 callback 들을 등록하는 메소드
+   * 체이닝을 위해 프로미스 인스턴스를 반환해야한다.
+   * 등록된 콜백의 결과값은 반환된 프로미스가 또 다시 귀결시킨다.
+   */
   then(onFulfilled?: Function, onRejected?: Function) {
     return new MyPromise(
       function (resolve, reject) {
         // 이 콜백 배열은 지금 생성되는 프로미스의 것이 아니라 이전 프로미스의 것
+
         this.fulfilledCallbacks.push((value) => {
           try {
             // onFulfilled 콜백이 주입되지 않더라도 귀결된 결과 다음 체이닝에 전달
@@ -163,5 +165,10 @@ export class MyPromise implements CustomPromise {
     );
   }
 
-  catch(onRejected: Function) {}
+  /** 프로미스 체이닝 중 발생한 rejected 및 에러를 처리하는 메소드
+   *  내부적으로 then 메소드를 호출한다.
+   */
+  catch(onRejected: Function) {
+    this.then(null, onRejected);
+  }
 }
