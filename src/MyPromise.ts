@@ -110,9 +110,8 @@ export class MyPromise implements CustomPromise {
 
     // then으로 등록된 callback들을 실행시켜준다.
     this.callbacks.forEach((callback) => {
-      if (this.state === PromiseStates.FULFILLED) {
+      if (this.state === PromiseStates.FULFILLED)
         return callback.onFulfilled(this.value);
-      }
 
       return callback.onRejected(this.value);
     });
@@ -121,11 +120,44 @@ export class MyPromise implements CustomPromise {
     this.callbacks = [];
   }
 
+  /** 프로미스 체이닝 마지막에 반드시 실행시켜야할 콜백을 등록하는 메소드
+   * 등록된 콜백의 결과값은 반환된 프로미스가 또 다시 귀결시킨다.
+   */
+  finally(onFinally: Function): MyPromise {
+    return new MyPromise(
+      function (resolve, reject) {
+        // finally의 경우 무조건 적으로 onFinally를 실행한다.
+        this.callbacks.push({
+          onFulfilled: function (value) {
+            try {
+              const callbackResult = onFinally();
+
+              if (typeof callbackResult === "undefined") resolve(value);
+              else resolve(callbackResult);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          onRejected: function (value) {
+            try {
+              const callbackResult = onFinally();
+
+              if (typeof callbackResult === "undefined") reject(value);
+              else reject(callbackResult);
+            } catch (error) {
+              reject(error);
+            }
+          },
+        });
+      }.bind(this)
+    );
+  }
+
   /** 프로미스 귀결 시 호출될 callback 들을 등록하는 메소드
    * 체이닝을 위해 프로미스 인스턴스를 반환해야한다.
    * 등록된 콜백의 결과값은 반환된 프로미스가 또 다시 귀결시킨다.
    */
-  then(onFulfilled?: Function, onRejected?: Function) {
+  then(onFulfilled?: Function, onRejected?: Function): MyPromise {
     return new MyPromise(
       function (resolve, reject) {
         // 이 콜백 배열은 지금 생성되는 프로미스 인스턴스의 것이 아니라 이전 프로미스 인스턴스의 것
@@ -171,6 +203,6 @@ export class MyPromise implements CustomPromise {
    *  내부적으로 then 메소드를 호출한다.
    */
   catch(onRejected: Function) {
-    this.then(null, onRejected);
+    return this.then(null, onRejected);
   }
 }
