@@ -32,7 +32,7 @@ interface then {
   (onFulfilled?: Function, onRejected?: Function);
 }
 
-interface thenCallbacks {
+export interface thenCallbacks {
   onFulfilled: Function;
   onRejected: Function;
 }
@@ -65,6 +65,13 @@ export class MyPromise implements CustomPromise {
     } catch (error) {
       this.reject(error);
     }
+  }
+
+  /** callbacks 배열 getter
+   * 복사된 배열을 반환하여 외부에서 변경할 수 없게 한다.
+   */
+  getCallbacks() {
+    return [...this.callbacks];
   }
 
   /** 프로미스 인스턴스를 이행(fulfilled) 상태로 귀결(settled) 시키는 메소드 */
@@ -120,39 +127,6 @@ export class MyPromise implements CustomPromise {
     this.callbacks = [];
   }
 
-  /** 프로미스 체이닝 마지막에 반드시 실행시켜야할 콜백을 등록하는 메소드
-   * 등록된 콜백의 결과값은 반환된 프로미스가 또 다시 귀결시킨다.
-   */
-  finally(onFinally: Function): MyPromise {
-    return new MyPromise(
-      function (resolve, reject) {
-        // finally의 경우 무조건 적으로 onFinally를 실행한다.
-        this.callbacks.push({
-          onFulfilled: function (value) {
-            try {
-              const callbackResult = onFinally();
-
-              if (typeof callbackResult === "undefined") resolve(value);
-              else resolve(callbackResult);
-            } catch (error) {
-              reject(error);
-            }
-          },
-          onRejected: function (value) {
-            try {
-              const callbackResult = onFinally();
-
-              if (typeof callbackResult === "undefined") reject(value);
-              else reject(callbackResult);
-            } catch (error) {
-              reject(error);
-            }
-          },
-        });
-      }.bind(this)
-    );
-  }
-
   /** 프로미스 귀결 시 호출될 callback 들을 등록하는 메소드
    * 체이닝을 위해 프로미스 인스턴스를 반환해야한다.
    * 등록된 콜백의 결과값은 반환된 프로미스가 또 다시 귀결시킨다.
@@ -204,5 +178,38 @@ export class MyPromise implements CustomPromise {
    */
   catch(onRejected: Function) {
     return this.then(null, onRejected);
+  }
+
+  /** 프로미스 체이닝 마지막에 반드시 실행시켜야할 콜백을 등록하는 메소드
+   * 등록된 콜백의 결과값은 반환된 프로미스가 또 다시 귀결시킨다.
+   */
+  finally(onFinally: Function): MyPromise {
+    return new MyPromise(
+      function (resolve, reject) {
+        // finally의 경우 무조건 적으로 onFinally를 실행한다.
+        this.callbacks.push({
+          onFulfilled: function (value) {
+            try {
+              const callbackResult = onFinally();
+
+              if (typeof callbackResult === "undefined") resolve(value);
+              else resolve(callbackResult);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          onRejected: function (value) {
+            try {
+              const callbackResult = onFinally();
+
+              if (typeof callbackResult === "undefined") reject(value);
+              else reject(callbackResult);
+            } catch (error) {
+              reject(error);
+            }
+          },
+        });
+      }.bind(this)
+    );
   }
 }
