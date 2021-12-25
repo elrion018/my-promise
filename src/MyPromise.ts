@@ -76,6 +76,9 @@ export class MyPromise implements CustomPromise {
     });
   }
 
+  /** 정적 reject 메소드
+   * 주어진 값으로 거부된 프로미스를 반환한다.
+   */
   static reject(value: any) {
     return new MyPromise((resolve, reject) => {
       reject(value);
