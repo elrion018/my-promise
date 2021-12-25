@@ -67,7 +67,16 @@ export class MyPromise implements CustomPromise {
     }
   }
 
-  /** callbacks 배열 getter
+  /** 정적 resolve 메소드
+   * 주어진 값으로 이행된 프로미스를 반환한다.
+   */
+  static resolve(value) {
+    return new MyPromise((resolve, reject) => {
+      resolve(value);
+    });
+  }
+
+  /** callbacks 배열 getter 메소드
    * 복사된 배열을 반환하여 외부에서 변경할 수 없게 한다.
    */
   getCallbacks() {

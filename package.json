@@ -4,7 +4,7 @@
   "description": "커스텀 프로미스를 구현해보는 프로젝트",
   "main": "index.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest --detectOpenHandles"
   },
   "repository": {
     "type": "git",
