@@ -70,9 +70,15 @@ export class MyPromise implements CustomPromise {
   /** 정적 resolve 메소드
    * 주어진 값으로 이행된 프로미스를 반환한다.
    */
-  static resolve(value) {
+  static resolve(value: any) {
     return new MyPromise((resolve, reject) => {
       resolve(value);
+    });
+  }
+
+  static reject(value: any) {
+    return new MyPromise((resolve, reject) => {
+      reject(value);
     });
   }
 
