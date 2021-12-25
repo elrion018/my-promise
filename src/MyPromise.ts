@@ -85,6 +85,18 @@ export class MyPromise implements CustomPromise {
     });
   }
 
+  /** 정적 race 메소드
+   * 가장 먼저 귀결된 프로미스 인스턴스의의 값을
+   * 자신의 귀결 값으로 삼는 프로미스 인스턴스를 반환한다.
+   */
+  static race(promises: Array<MyPromise>) {
+    return new MyPromise((resolve, reject) => {
+      promises.forEach((promise) => {
+        promise.then(resolve, reject);
+      });
+    });
+  }
+
   /** callbacks 배열 getter 메소드
    * 복사된 배열을 반환하여 외부에서 변경할 수 없게 한다.
    */

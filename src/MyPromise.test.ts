@@ -231,12 +231,60 @@ test("Promise.reject 정적 메서드는 원시 값이 주어질 경우 주어�
   });
 });
 
-test("Promise.resolve 정적 메서드는 프로미스 인스턴스가 값으로 주어질 경우 주어진 프로미스 인스턴스를 거부시키고 그 거부 값을 가진 프로미스 인스턴스를 반환한다.", (done) => {
+test("Promise.reject 정적 메서드는 프로미스 인스턴스가 값으로 주어질 경우 주어진 프로미스 인스턴스를 거부시키고 그 거부 값을 가진 프로미스 인스턴스를 반환한다.", (done) => {
   const promise = MyPromise.reject(MyPromise.reject(4));
 
   promise.then(null, (value) => {
     try {
       expect(value).toBe(4);
+      done();
+    } catch (error) {
+      done(error);
+    }
+  });
+});
+
+test("Promise.race 정적 메서드는 인수로 받은 배열 내의 프로미스 인스턴스 중 최초로 귀결된 프로미스 인스턴스의 값을 자신의 귀결 값으로 갖는 프로미스 인스턴스를 반환한다. (resolve)", (done) => {
+  MyPromise.race([
+    new MyPromise((resolve, reject) => {
+      const timerId = setTimeout(() => {
+        clearTimeout(timerId);
+        resolve(22);
+      }, 2000);
+    }),
+    new MyPromise((resolve, reject) => {
+      const timerId = setTimeout(() => {
+        clearTimeout(timerId);
+        resolve(33);
+      }, 4000);
+    }),
+  ]).then((value) => {
+    try {
+      expect(value).toBe(22);
+      done();
+    } catch (error) {
+      done(error);
+    }
+  });
+});
+
+test("Promise.race 정적 메서드는 인수로 받은 배열 내의 프로미스 인스턴스 중 최초로 귀결된 프로미스 인스턴스의 값을 자신의 귀결 값으로 갖는 프로미스 인스턴스를 반환한다.(reject)", (done) => {
+  MyPromise.race([
+    new MyPromise((resolve, reject) => {
+      const timerId = setTimeout(() => {
+        clearTimeout(timerId);
+        reject(22);
+      }, 2000);
+    }),
+    new MyPromise((resolve, reject) => {
+      const timerId = setTimeout(() => {
+        clearTimeout(timerId);
+        reject(33);
+      }, 4000);
+    }),
+  ]).then(null, (value) => {
+    try {
+      expect(value).toBe(22);
       done();
     } catch (error) {
       done(error);
