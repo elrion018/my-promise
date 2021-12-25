@@ -150,7 +150,7 @@ export class MyPromise implements CustomPromise {
 
               return resolve(onFulfilled(value));
             } catch (error) {
-              reject(error);
+              return reject(error);
             }
           },
 

@@ -19,6 +19,7 @@
   "homepage": "https://github.com/elrion018/my-promise#readme",
   "devDependencies": {
     "@babel/core": "^7.16.5",
+    "@babel/plugin-transform-modules-commonjs": "^7.16.5",
     "@babel/preset-env": "^7.16.5",
     "@babel/preset-typescript": "^7.16.5",
     "@types/jest": "^27.0.3",
