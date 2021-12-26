@@ -5,6 +5,17 @@ enum PromiseStates {
   REJECTED = "REJECTED",
 }
 
+/** 프로미스 인스턴스의 귀결 값이 될 수 있는 타입 정의 */
+type settledValue =
+  | number
+  | string
+  | boolean
+  | null
+  | undefined
+  | Object
+  | Array<any>
+  | MyPromise;
+
 /** 커스텀 프로미스를 구현하기 위한 인터페이스 */
 interface CustomPromise {
   state: string;
@@ -52,7 +63,7 @@ interface excecutor {
 /** 프로미스 클래스 */
 export class MyPromise implements CustomPromise {
   state: string;
-  value: any;
+  value: settledValue;
   callbacks: Array<thenCallbacks>;
 
   constructor(excecutor: excecutor) {
@@ -60,6 +71,8 @@ export class MyPromise implements CustomPromise {
     this.value = undefined;
     this.callbacks = [];
 
+    // excecutor는 프로미스 인스턴스의 resolve와 reject를 인자로 받는다.
+    // 그 결과, excecutor 내에서 프로미스 인스턴스의 귀결을 결정할 수 있게 된다.
     try {
       excecutor(this.resolve.bind(this), this.reject.bind(this));
     } catch (error) {
@@ -70,7 +83,7 @@ export class MyPromise implements CustomPromise {
   /** 정적 resolve 메소드
    * 주어진 값으로 이행된 프로미스를 반환한다.
    */
-  static resolve(value: any) {
+  static resolve(value: settledValue) {
     return new MyPromise((resolve, reject) => {
       resolve(value);
     });
@@ -79,7 +92,7 @@ export class MyPromise implements CustomPromise {
   /** 정적 reject 메소드
    * 주어진 값으로 거부된 프로미스를 반환한다.
    */
-  static reject(value: any) {
+  static reject(value: settledValue) {
     return new MyPromise((resolve, reject) => {
       reject(value);
     });
@@ -105,19 +118,17 @@ export class MyPromise implements CustomPromise {
   }
 
   /** 프로미스 인스턴스를 이행(fulfilled) 상태로 귀결(settled) 시키는 메소드 */
-  resolve(value: any) {
+  resolve(value: settledValue) {
     this.updateData(value, PromiseStates.FULFILLED);
   }
 
   /** 프로미스 인스턴스를 거절(rejected) 상태로 귀결시키는 메소드 */
-  reject(value: any) {
+  reject(value: settledValue) {
     this.updateData(value, PromiseStates.REJECTED);
   }
 
-  updateData(value, state) {
+  updateData(value: any, state: PromiseStates) {
     // setTimeout으로 설정하여 지연시켜주기
-    // 그렇지 않으면 동기적으로 then 체이닝이 끝날 때까지 재귀적으로 연계된다.
-    // 이 경우 같은 프로미스 인스턴스에 대한 분기를 사용할 수 없게 됨.
     setTimeout(
       function () {
         // 프로미스 인스턴스가 이미 귀결 상태라면 무시해주기
@@ -167,7 +178,7 @@ export class MyPromise implements CustomPromise {
         // 이 콜백 배열은 지금 생성되는 프로미스 인스턴스의 것이 아니라 이전 프로미스 인스턴스의 것
         // 여기 추가되는 콜백들은 이전 프로미스 인스턴스가 귀결될 때 작동한다.
         this.callbacks.push({
-          onFulfilled: function (value) {
+          onFulfilled: function (value: settledValue) {
             try {
               // onFulfilled 콜백이 주입되지 않더라도 귀결된 결과 다음 체이닝에 전달
               // 즉, 다음 프로미스를 귀결시킨다.
@@ -184,7 +195,7 @@ export class MyPromise implements CustomPromise {
             }
           },
 
-          onRejected: function (value) {
+          onRejected: function (value: settledValue) {
             try {
               // onRejected 콜백이 주입되지 않더라도 귀결된 결과 다음 체이닝에 전달
               if (!onRejected) {
@@ -218,7 +229,7 @@ export class MyPromise implements CustomPromise {
       function (resolve, reject) {
         // finally의 경우 무조건 적으로 onFinally를 실행한다.
         this.callbacks.push({
-          onFulfilled: function (value) {
+          onFulfilled: function (value: settledValue) {
             try {
               const callbackResult = onFinally();
 
@@ -228,7 +239,7 @@ export class MyPromise implements CustomPromise {
               reject(error);
             }
           },
-          onRejected: function (value) {
+          onRejected: function (value: settledValue) {
             try {
               const callbackResult = onFinally();
 
